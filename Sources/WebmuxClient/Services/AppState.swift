@@ -132,9 +132,14 @@ final class AppState {
     let tsR = await Shell.runAsync("/Applications/Tailscale.app/Contents/MacOS/Tailscale status --json 2>/dev/null")
     hasTailscale = tsR.exitCode == 0
     if hasTailscale {
-      let hostR = await Shell.runAsync("/Applications/Tailscale.app/Contents/MacOS/Tailscale status --json 2>/dev/null | /usr/bin/grep -o '\"DNSName\":\"[^\"]*\"' | head -1 | sed 's/\"DNSName\":\"//;s/\\.$//' | sed 's/\"$//'")
-      let raw = hostR.output.trimmingCharacters(in: .whitespacesAndNewlines)
-      tailscaleHostname = raw.isEmpty ? "" : raw
+      let json = tsR.output
+      if let selfRange = json.range(of: "\"Self\":"),
+         let dnsRange = json[selfRange.upperBound...].range(of: "\"DNSName\":\""),
+         let endQuote = json[dnsRange.upperBound...].firstIndex(of: "\"") {
+        var raw = String(json[dnsRange.upperBound..<endQuote])
+        if raw.hasSuffix(".") { raw = String(raw.dropLast()) }
+        tailscaleHostname = raw
+      }
     }
 
     let brewPrefix = BrewManager.brewPrefix()

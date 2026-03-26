@@ -26,9 +26,9 @@ struct StepDoneView: View {
           .font(KG.mono)
           .foregroundStyle(KG.green)
 
-        if !state.tailscaleHostname.isEmpty {
-          VStack(spacing: 8) {
-            Text("Scan to open on your phone:")
+        VStack(spacing: 8) {
+          if !state.tailscaleHostname.isEmpty {
+            Text("Scan to open webmux on your phone:")
               .font(KG.monoSmall)
               .foregroundStyle(KG.cyan.opacity(0.5))
 
@@ -46,14 +46,25 @@ struct StepDoneView: View {
               .font(.system(size: 10, design: .monospaced))
               .foregroundStyle(KG.cyan.opacity(0.4))
               .textSelection(.enabled)
+          } else {
+            Text("Install Tailscale on your phone to connect:")
+              .font(KG.monoSmall)
+              .foregroundStyle(KG.cyan.opacity(0.5))
+
+            if let qrImage = generateQR(for: "https://tailscale.com/download") {
+              Image(nsImage: qrImage)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 140, height: 140)
+                .background(Color.white)
+                .cornerRadius(6)
+            }
+
+            Text("tailscale.com/download")
+              .font(.system(size: 10, design: .monospaced))
+              .foregroundStyle(KG.cyan.opacity(0.4))
           }
-        } else {
-          VStack(alignment: .leading, spacing: 4) {
-            Text("  The terminal icon in your menu bar")
-            Text("  controls services, updates & logs.")
-          }
-          .font(KG.monoSmall)
-          .foregroundStyle(KG.cyan.opacity(0.5))
         }
 
         Button("OPEN BROWSER") {
