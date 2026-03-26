@@ -443,7 +443,7 @@ final class AppState {
 
     // Check client (GitHub API)
     clientOutdated = false
-    let apiUrl = "https://api.github.com/repos/alphatechlab/webmux-client/releases/latest"
+    let apiUrl = "https://api.github.com/repos/alphatechlab/webmux-app/releases/latest"
     let r = await Shell.runAsync("curl -sf '\(apiUrl)' 2>/dev/null")
     if r.exitCode == 0 {
       // Parse tag_name from JSON
@@ -493,7 +493,7 @@ final class AppState {
     if clientOutdated {
       workMessage = "Downloading client v\(latestClientVersion)..."
       let tag = "v\(latestClientVersion)"
-      let downloadUrl = "https://github.com/alphatechlab/webmux-client/releases/download/\(tag)/Webmux.app.tar.gz"
+      let downloadUrl = "https://github.com/alphatechlab/webmux-app/releases/download/\(tag)/Webmux.app.tar.gz"
       let tmpDir = "/tmp/webmux-client-update"
       let cmd = """
         rm -rf '\(tmpDir)' && mkdir -p '\(tmpDir)' && \
