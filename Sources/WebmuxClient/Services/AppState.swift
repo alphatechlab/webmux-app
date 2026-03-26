@@ -134,10 +134,11 @@ final class AppState {
     hasTailscale = tsR.exitCode == 0
     if hasTailscale {
       let json = tsR.output
-      if let selfRange = json.range(of: "\"Self\":"),
-         let dnsRange = json[selfRange.upperBound...].range(of: "\"DNSName\":\""),
-         let endQuote = json[dnsRange.upperBound...].firstIndex(of: "\"") {
-        var raw = String(json[dnsRange.upperBound..<endQuote])
+      if let selfRange = json.range(of: "\"Self\""),
+         let dnsRange = json[selfRange.upperBound...].range(of: "\"DNSName\""),
+         let colonQuote = json[dnsRange.upperBound...].range(of: "\""),
+         let endQuote = json[colonQuote.upperBound...].firstIndex(of: "\"") {
+        var raw = String(json[colonQuote.upperBound..<endQuote])
         if raw.hasSuffix(".") { raw = String(raw.dropLast()) }
         tailscaleHostname = raw
       }
