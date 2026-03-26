@@ -1,7 +1,23 @@
 import SwiftUI
+import AppKit
+
+private func terminateIfAlreadyRunning() {
+  let dominated = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+    .filter { $0 != NSRunningApplication.current }
+  if !dominated.isEmpty {
+    NSApp.terminate(nil)
+  }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    terminateIfAlreadyRunning()
+  }
+}
 
 @main
 struct WebmuxClientApp: App {
+  @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   @State private var state = AppState()
 
   var body: some Scene {
