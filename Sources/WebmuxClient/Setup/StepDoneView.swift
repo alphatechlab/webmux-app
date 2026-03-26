@@ -72,7 +72,8 @@ struct StepDoneView: View {
     }
     .frame(maxWidth: .infinity)
     .padding(.horizontal, 16)
-    .padding(.vertical, 12)
+    .padding(.top, 16)
+    .padding(.bottom, 12)
   }
 
   private func generateQR(for string: String) -> NSImage? {
