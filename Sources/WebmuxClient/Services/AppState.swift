@@ -59,6 +59,13 @@ final class AppState {
 
   var webmuxRunning = false
   var whisperRunning = false
+  var caffeinateEnabled: Bool = UserDefaults.standard.bool(forKey: "caffeinateEnabled") {
+    didSet {
+      UserDefaults.standard.set(caffeinateEnabled, forKey: "caffeinateEnabled")
+      if caffeinateEnabled { startCaffeinate() } else { stopCaffeinate() }
+    }
+  }
+  private var caffeinateProcess: Process?
   var backendOutdated = false
   var clientOutdated = false
   var latestClientVersion = ""
@@ -93,6 +100,8 @@ final class AppState {
     let ready = hasWebmux && hasServices
     mode = ready ? .running : .setup
 
+    if caffeinateEnabled { startCaffeinate() }
+
     if mode == .running {
       await ServiceManager.startAll()
       try? await Task.sleep(for: .seconds(2))
@@ -110,6 +119,7 @@ final class AppState {
       guard let self else { return }
       MainActor.assumeIsolated {
         self.pollTimer?.invalidate()
+        self.stopCaffeinate()
         ServiceManager.stopAllSync()
       }
     }
@@ -538,5 +548,25 @@ final class AppState {
 
   func openLog(_ path: String) {
     NSWorkspace.shared.open(URL(fileURLWithPath: path))
+  }
+
+  // MARK: - Caffeinate
+
+  func startCaffeinate() {
+    guard caffeinateProcess == nil else { return }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
+    process.arguments = ["-dis"]
+    do {
+      try process.run()
+      caffeinateProcess = process
+    } catch {
+      print("caffeinate error: \(error)")
+    }
+  }
+
+  func stopCaffeinate() {
+    caffeinateProcess?.terminate()
+    caffeinateProcess = nil
   }
 }

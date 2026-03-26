@@ -11,6 +11,8 @@ struct MenuBarView: View {
         separator
         servicesSection
         if state.isWorking { progressSection }
+        separator
+        optionsSection
       } else {
         separator
         notInstalledSection
@@ -163,6 +165,30 @@ struct MenuBarView: View {
   }
 
 
+
+  // MARK: - Options
+
+  private var optionsSection: some View {
+    HStack(spacing: 8) {
+      Text("Keep awake")
+        .font(KG.monoSmall)
+        .foregroundStyle(state.caffeinateEnabled ? KG.green : KG.cyan.opacity(0.4))
+      Spacer()
+      Button {
+        state.caffeinateEnabled.toggle()
+      } label: {
+        Text(state.caffeinateEnabled ? " ON" : "OFF")
+          .font(.system(size: 9, weight: .bold, design: .monospaced))
+          .foregroundStyle(.black)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(state.caffeinateEnabled ? KG.green : KG.pink.opacity(0.6))
+          .cornerRadius(3)
+      }
+      .buttonStyle(.plain)
+    }
+    .padding(.horizontal, 8)
+  }
 
   // MARK: - Progress
 
