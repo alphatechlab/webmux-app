@@ -27,14 +27,15 @@ struct SetupView: View {
       Rectangle().fill(KG.cyan.opacity(0.15)).frame(height: 1)
 
       // Content
-      stepContent
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .clipped()
+      ScrollView {
+        stepContent
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .frame(maxHeight: .infinity)
 
       // Footer
       Rectangle().fill(KG.cyan.opacity(0.3)).frame(height: 1)
       footer
-        .fixedSize(horizontal: false, vertical: true)
     }
     .frame(width: 560, height: 600)
     .background(KG.bg)
