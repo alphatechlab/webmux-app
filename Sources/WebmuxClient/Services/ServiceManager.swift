@@ -113,6 +113,8 @@ enum ServiceManager {
               <string>production</string>
               <key>HOME</key>
               <string>\(home)</string>
+              <key>PATH</key>
+              <string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
           </dict>
           <key>KeepAlive</key>
           <true/>
@@ -125,9 +127,7 @@ enum ServiceManager {
       """
 
     let webmuxPath = "\(plistDir)/\(ServiceLabel.webmux.plistFilename)"
-    if !FileManager.default.fileExists(atPath: webmuxPath) {
-      try? webmuxPlist.write(toFile: webmuxPath, atomically: true, encoding: .utf8)
-    }
+    try? webmuxPlist.write(toFile: webmuxPath, atomically: true, encoding: .utf8)
 
     if let wDir = whisperDir {
       let whisperPlist = """
@@ -161,9 +161,7 @@ enum ServiceManager {
         """
 
       let whisperPath = "\(plistDir)/\(ServiceLabel.whisper.plistFilename)"
-      if !FileManager.default.fileExists(atPath: whisperPath) {
-        try? whisperPlist.write(toFile: whisperPath, atomically: true, encoding: .utf8)
-      }
+      try? whisperPlist.write(toFile: whisperPath, atomically: true, encoding: .utf8)
     }
   }
 }
