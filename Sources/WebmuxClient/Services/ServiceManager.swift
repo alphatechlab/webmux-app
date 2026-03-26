@@ -1,8 +1,8 @@
 import Foundation
 
 enum ServiceLabel: String, CaseIterable, Sendable {
-  case webmux = "com.alphatechlab.webmux"
-  case whisper = "com.alphatechlab.webmux-whisper"
+  case webmux = "com.user.webmux"
+  case whisper = "com.user.webmux-whisper"
 
   var displayName: String {
     switch self {

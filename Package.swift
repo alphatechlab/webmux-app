@@ -7,7 +7,10 @@ let package = Package(
   targets: [
     .executableTarget(
       name: "WebmuxClient",
-      path: "Sources/WebmuxClient"
+      path: "Sources/WebmuxClient",
+      resources: [
+        .process("Resources")
+      ]
     )
   ]
 )

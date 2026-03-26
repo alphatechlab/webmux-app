@@ -2,63 +2,57 @@ import SwiftUI
 
 struct StepDoneView: View {
   @Bindable var state: AppState
+  @State private var glowPhase = false
 
   var body: some View {
     VStack(spacing: 16) {
       Spacer()
 
       if state.mode == .running {
-        Image(systemName: "checkmark.circle.fill")
-          .font(.system(size: 48))
-          .foregroundStyle(.green)
-
-        Text("You're all set!")
-          .font(.title2.bold())
-
-        Text("Webmux is running. You'll find the icon in your menu bar.")
-          .font(.callout)
-          .foregroundStyle(.secondary)
-          .multilineTextAlignment(.center)
-
-        HStack(spacing: 12) {
-          Image(systemName: "terminal.fill")
-            .foregroundStyle(.secondary)
-          VStack(alignment: .leading) {
-            Text("Menu bar")
-              .font(.system(size: 12, weight: .medium))
-            Text("Control services, check updates, view logs")
-              .font(.caption)
-              .foregroundStyle(.secondary)
+        Text("READY")
+          .font(.system(size: 28, weight: .black, design: .monospaced))
+          .foregroundStyle(
+            LinearGradient(colors: [KG.cyan, KG.magenta], startPoint: .leading, endPoint: .trailing)
+          )
+          .shadow(color: KG.cyan.opacity(glowPhase ? 0.6 : 0.2), radius: glowPhase ? 12 : 4)
+          .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+              glowPhase = true
+            }
           }
-        }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
 
-        Button("Open in Browser") {
+        Text("webmux is running")
+          .font(KG.mono)
+          .foregroundStyle(KG.green)
+
+        VStack(alignment: .leading, spacing: 4) {
+          Text("  The terminal icon in your menu bar")
+          Text("  controls services, updates & logs.")
+        }
+        .font(KG.monoSmall)
+        .foregroundStyle(KG.cyan.opacity(0.5))
+
+        Button("OPEN BROWSER") {
           state.openInBrowser()
         }
-        .controlSize(.large)
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(NeonAccentButton())
+        .padding(.top, 8)
+
       } else {
         ProgressView()
-        Text("Setting things up...")
-          .font(.callout)
-          .foregroundStyle(.secondary)
+          .tint(KG.cyan)
+        Text("INITIALIZING...")
+          .font(KG.mono)
+          .foregroundStyle(KG.cyan)
 
-        if state.hasServices {
-          Text("Starting services...")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-        } else {
-          Text("Creating services...")
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-        }
+        Text(state.hasServices ? "Starting services..." : "Creating services...")
+          .font(KG.monoSmall)
+          .foregroundStyle(KG.cyan.opacity(0.4))
       }
 
       Spacer()
     }
     .frame(maxWidth: .infinity)
-    .padding(20)
+    .padding(16)
   }
 }

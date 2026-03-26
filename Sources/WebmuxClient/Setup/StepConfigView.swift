@@ -4,26 +4,34 @@ struct StepConfigView: View {
   @Bindable var state: AppState
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      Text("Configure")
-        .font(.headline)
+    VStack(alignment: .leading, spacing: 14) {
+      Text("CONFIGURE")
+        .font(KG.monoBig)
+        .foregroundStyle(KG.cyan)
 
       Text("Set up your webmux preferences.")
-        .font(.callout)
-        .foregroundStyle(.secondary)
+        .font(KG.monoSmall)
+        .foregroundStyle(KG.green.opacity(0.6))
 
-      VStack(alignment: .leading, spacing: 8) {
-        Text("Projects directory")
-          .font(.system(size: 13, weight: .medium))
-        Text("Each subdirectory becomes a terminal session in webmux.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+      // Projects dir
+      VStack(alignment: .leading, spacing: 6) {
+        Text("PROJECTS DIRECTORY")
+          .font(KG.monoSmall)
+          .foregroundStyle(KG.cyan.opacity(0.7))
+        Text("Each subdirectory = a terminal session")
+          .font(.system(size: 9, design: .monospaced))
+          .foregroundStyle(KG.cyan.opacity(0.3))
 
         HStack {
           TextField("~/GitHub", text: $state.githubDir)
-            .textFieldStyle(.roundedBorder)
+            .font(KG.mono)
+            .foregroundStyle(KG.green)
+            .textFieldStyle(.plain)
+            .padding(6)
+            .background(Color.black)
+            .neonBorder(KG.cyan.opacity(0.4))
 
-          Button("Browse...") {
+          Button("BROWSE") {
             let panel = NSOpenPanel()
             panel.canChooseDirectories = true
             panel.canChooseFiles = false
@@ -35,39 +43,44 @@ struct StepConfigView: View {
               state.githubDir = url.path
             }
           }
+          .buttonStyle(NeonButton())
         }
       }
-      .padding(12)
-      .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
+      .padding(10)
+      .background(KG.bgCard)
+      .neonBorder()
 
-      VStack(alignment: .leading, spacing: 8) {
-        Text("Summary")
-          .font(.system(size: 13, weight: .medium))
+      // Summary
+      VStack(alignment: .leading, spacing: 6) {
+        Text("SUMMARY")
+          .font(KG.monoSmall)
+          .foregroundStyle(KG.cyan.opacity(0.7))
 
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
-          GridRow {
+        HStack(spacing: 0) {
+          VStack(alignment: .leading, spacing: 4) {
             Text("Server")
-              .foregroundStyle(.secondary)
-            Text("https://localhost:3030")
-          }
-          GridRow {
             Text("Projects")
-              .foregroundStyle(.secondary)
-            Text(state.githubDir.isEmpty ? "Not set" : state.githubDir)
-          }
-          GridRow {
             Text("Whisper")
-              .foregroundStyle(.secondary)
-            Text(state.hasWhisper ? "Enabled (port 8000)" : "Disabled")
           }
+          .font(KG.monoSmall)
+          .foregroundStyle(KG.cyan.opacity(0.4))
+          .frame(width: 80, alignment: .leading)
+
+          VStack(alignment: .leading, spacing: 4) {
+            Text("https://localhost:3030")
+            Text(state.githubDir.isEmpty ? "---" : state.githubDir)
+            Text(state.hasWhisper ? "ON  (port 8000)" : "OFF")
+          }
+          .font(KG.monoSmall)
+          .foregroundStyle(KG.green)
         }
-        .font(.system(size: 12))
       }
-      .padding(12)
-      .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
+      .padding(10)
+      .background(KG.bgCard)
+      .neonBorder()
 
       Spacer()
     }
-    .padding(20)
+    .padding(16)
   }
 }

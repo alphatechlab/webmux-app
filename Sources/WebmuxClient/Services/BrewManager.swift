@@ -48,6 +48,10 @@ enum BrewManager {
     Shell.login("which python3").exitCode == 0
   }
 
+  static func isFfmpegInstalled() -> Bool {
+    Shell.login("which ffmpeg").exitCode == 0
+  }
+
   static func isWebmuxInstalled() -> Bool {
     let r = Shell.run("\(brewPrefix())/bin/brew list \(formulaName) 2>/dev/null")
     return r.exitCode == 0

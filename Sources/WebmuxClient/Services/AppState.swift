@@ -28,6 +28,7 @@ final class AppState {
   var hasNode = false
   var hasRust = false
   var hasPython = false
+  var hasFfmpeg = false
   var hasWebmux = false
   var hasWhisper = false
   var hasServices = false
@@ -45,20 +46,35 @@ final class AppState {
 
   var webmuxRunning = false
   var whisperRunning = false
-  var isOutdated = false
+  var backendOutdated = false
+  var clientOutdated = false
+  var latestClientVersion = ""
+  var isOutdated: Bool { backendOutdated || clientOutdated }
   var isWorking = false
   var workMessage = ""
   var lastCheckMessage = ""
   var isChecking = false
 
+  var currentClientVersion: String {
+    Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+  }
+
   var allRunning: Bool { webmuxRunning && whisperRunning }
   var anyRunning: Bool { webmuxRunning || whisperRunning }
 
   private var pollTimer: Timer?
+  private var updateTimer: Timer?
+  private var didBootstrap = false
 
   // MARK: - Init
 
   func bootstrap() async {
+    guard !didBootstrap else {
+      await checkDependencies()
+      return
+    }
+    didBootstrap = true
+
     await checkDependencies()
 
     let ready = hasWebmux && hasServices
@@ -69,6 +85,9 @@ final class AppState {
       try? await Task.sleep(for: .seconds(2))
       refreshServices()
       startPolling()
+      // Auto-check for updates now + every 6h
+      Task { await checkForUpdates() }
+      startUpdatePolling()
     }
 
     NotificationCenter.default.addObserver(
@@ -86,18 +105,40 @@ final class AppState {
   // MARK: - Dependency checks
 
   func checkDependencies() async {
+    // FileManager checks (instant, no shell)
     hasHomebrew = BrewManager.isBrewInstalled()
-    hasNode = BrewManager.isNodeInstalled()
-    hasPython = BrewManager.isPythonInstalled()
-    hasRust = BrewManager.isRustInstalled()
-    hasWebmux = BrewManager.isWebmuxInstalled()
     hasWhisper = BrewManager.isWhisperInstalled()
     hasServices = ServiceManager.allPlistsExist()
 
-    if hasNode { nodeVersion = BrewManager.nodeVersion() ?? "" }
-    if hasRust { rustVersion = BrewManager.rustVersion() ?? "" }
+    // Shell checks (run off main thread via Shell.runAsync)
+    let nodeR = await Shell.runAsync("which node", login: true)
+    hasNode = nodeR.exitCode == 0
 
+    let rustR = await Shell.runAsync("which rustc", login: true)
+    hasRust = rustR.exitCode == 0
+
+    let pythonR = await Shell.runAsync("which python3", login: true)
+    hasPython = pythonR.exitCode == 0
+
+    let ffmpegR = await Shell.runAsync("which ffmpeg", login: true)
+    hasFfmpeg = ffmpegR.exitCode == 0
+
+    let brewPrefix = BrewManager.brewPrefix()
+    let brewInstalled = FileManager.default.fileExists(atPath: "\(brewPrefix)/Cellar/webmux")
     let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let manualInstalled = FileManager.default.fileExists(atPath: "\(home)/GitHub/webmux/dist/server/index.js")
+    hasWebmux = brewInstalled || manualInstalled
+
+    if hasNode {
+      let nv = await Shell.runAsync("node --version", login: true)
+      nodeVersion = nv.output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    if hasRust {
+      let rv = await Shell.runAsync("rustc --version", login: true)
+      rustVersion = rv.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "rustc ", with: "")
+    }
+
     if githubDir.isEmpty {
       let defaultDir = "\(home)/GitHub"
       if FileManager.default.fileExists(atPath: defaultDir) {
@@ -209,14 +250,39 @@ final class AppState {
   // MARK: - Runtime
 
   func refreshServices() {
-    webmuxRunning = ServiceManager.isRunning(.webmux)
-    whisperRunning = ServiceManager.isRunning(.whisper)
+    Task {
+      let uid = "\(getuid())"
+      let wR = await Shell.runAsync("launchctl print gui/\(uid)/\(ServiceLabel.webmux.rawValue) 2>/dev/null")
+      let whR = await Shell.runAsync("launchctl print gui/\(uid)/\(ServiceLabel.whisper.rawValue) 2>/dev/null")
+      webmuxRunning = parsePid(wR.output)
+      whisperRunning = parsePid(whR.output)
+    }
+  }
+
+  private func parsePid(_ output: String) -> Bool {
+    for line in output.components(separatedBy: "\n") {
+      let trimmed = line.trimmingCharacters(in: .whitespaces)
+      if trimmed.hasPrefix("pid = ") {
+        let pidStr = trimmed.replacingOccurrences(of: "pid = ", with: "")
+        return (Int(pidStr) ?? 0) > 0
+      }
+    }
+    return false
   }
 
   private func startPolling() {
     pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
       Task { @MainActor [weak self] in
         self?.refreshServices()
+      }
+    }
+  }
+
+  private func startUpdatePolling() {
+    let sixHours: TimeInterval = 6 * 60 * 60
+    updateTimer = Timer.scheduledTimer(withTimeInterval: sixHours, repeats: true) { [weak self] _ in
+      Task { @MainActor [weak self] in
+        await self?.checkForUpdates()
       }
     }
   }
@@ -272,37 +338,88 @@ final class AppState {
   func checkForUpdates() async {
     isChecking = true
     lastCheckMessage = ""
-    let outdated = await BrewManager.checkOutdated()
-    isOutdated = outdated
-    lastCheckMessage = outdated ? "" : "Up to date"
+
+    // Check backend (brew)
+    backendOutdated = await BrewManager.checkOutdated()
+
+    // Check client (GitHub API)
+    clientOutdated = false
+    let apiUrl = "https://api.github.com/repos/alphatechlab/webmux-client/releases/latest"
+    let r = await Shell.runAsync("curl -sf '\(apiUrl)' 2>/dev/null")
+    if r.exitCode == 0 {
+      // Parse tag_name from JSON
+      if let range = r.output.range(of: "\"tag_name\":\""),
+         let end = r.output[range.upperBound...].firstIndex(of: "\"") {
+        let remote = String(r.output[range.upperBound..<end]).replacingOccurrences(of: "v", with: "")
+        latestClientVersion = remote
+        clientOutdated = remote != currentClientVersion && remote > currentClientVersion
+      }
+    }
+
+    lastCheckMessage = isOutdated ? "" : "Up to date"
     isChecking = false
+  }
+
+  var updateSummary: String {
+    if backendOutdated && clientOutdated { return "SERVER+APP" }
+    if backendOutdated { return "SERVER" }
+    if clientOutdated { return "APP" }
+    return ""
   }
 
   func runUpdate() async {
     isWorking = true
-    workMessage = "Stopping services..."
-    await ServiceManager.stopAll()
 
-    workMessage = "Upgrading webmux..."
-    let code = await BrewManager.upgrade { [weak self] line in
-      Task { @MainActor [weak self] in
-        self?.workMessage = String(line.prefix(80))
+    if backendOutdated {
+      workMessage = "Stopping services..."
+      await ServiceManager.stopAll()
+
+      workMessage = "Upgrading server..."
+      let code = await BrewManager.upgrade { [weak self] line in
+        Task { @MainActor [weak self] in
+          self?.workMessage = String(line.prefix(80))
+        }
+      }
+
+      if code != 0 {
+        workMessage = "Server upgrade failed"
+        try? await Task.sleep(for: .seconds(3))
+      } else {
+        backendOutdated = false
+        workMessage = "Restarting services..."
+        await ServiceManager.startAll()
       }
     }
 
-    if code != 0 {
-      workMessage = "Upgrade failed"
-      try? await Task.sleep(for: .seconds(3))
-    } else {
-      workMessage = "Restarting..."
-      await ServiceManager.startAll()
-      isOutdated = false
-      workMessage = "Updated!"
+    if clientOutdated {
+      workMessage = "Downloading client v\(latestClientVersion)..."
+      let tag = "v\(latestClientVersion)"
+      let downloadUrl = "https://github.com/alphatechlab/webmux-client/releases/download/\(tag)/Webmux.app.tar.gz"
+      let tmpDir = "/tmp/webmux-client-update"
+      let cmd = """
+        rm -rf '\(tmpDir)' && mkdir -p '\(tmpDir)' && \
+        curl -fSL '\(downloadUrl)' -o '\(tmpDir)/Webmux.app.tar.gz' && \
+        tar -xzf '\(tmpDir)/Webmux.app.tar.gz' -C '\(tmpDir)' && \
+        cp -r '\(tmpDir)/Webmux.app' /Applications/ && \
+        rm -rf '\(tmpDir)'
+        """
+      let r = await Shell.runAsync(cmd, login: true)
+      if r.exitCode == 0 {
+        clientOutdated = false
+        workMessage = "App updated! Restart to apply."
+        try? await Task.sleep(for: .seconds(3))
+      } else {
+        workMessage = "Client download failed"
+        try? await Task.sleep(for: .seconds(3))
+      }
+    }
+
+    if !backendOutdated && !clientOutdated {
+      workMessage = "All updated!"
       try? await Task.sleep(for: .seconds(1))
     }
 
     isWorking = false
-    try? await Task.sleep(for: .seconds(1))
     refreshServices()
   }
 

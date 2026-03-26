@@ -7,56 +7,137 @@ struct MenuBarView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       header
-      Divider().padding(.vertical, 8)
-      servicesSection
-      Divider().padding(.vertical, 8)
-      projectSection
-      if state.isWorking {
-        progressSection
+      if state.hasWebmux {
+        separator
+        servicesSection
+        if state.isWorking { progressSection }
+      } else {
+        separator
+        notInstalledSection
       }
-      Divider().padding(.vertical, 8)
+      separator
       actionsSection
     }
-    .padding(12)
-    .frame(width: 280)
+    .padding(10)
+    .frame(width: 290)
+    .background(KG.bg)
+  }
+
+  private var separator: some View {
+    Rectangle().fill(KG.cyan.opacity(0.15)).frame(height: 1).padding(.vertical, 6)
   }
 
   // MARK: - Header
 
   private var header: some View {
-    HStack {
-      Image(systemName: "terminal.fill")
-        .foregroundStyle(.secondary)
-      Text("Webmux")
-        .font(.headline)
+    HStack(spacing: 6) {
+      Text("WEBMUX")
+        .font(KG.monoBig)
+        .foregroundStyle(
+          LinearGradient(colors: [KG.cyan, KG.magenta], startPoint: .leading, endPoint: .trailing)
+        )
       Spacer()
-      statusBadge
+      if state.hasWebmux {
+        updateBadge
+        startStopBadge
+        statusBadge
+      }
     }
   }
 
-  private var statusBadge: some View {
-    Text(state.allRunning ? "All running" : state.anyRunning ? "Partial" : "Stopped")
-      .font(.caption2)
+  @ViewBuilder
+  private var updateBadge: some View {
+    if state.isOutdated {
+      Button(state.updateSummary) { Task { await state.runUpdate() } }
+      .font(.system(size: 9, weight: .bold, design: .monospaced))
+      .foregroundStyle(KG.yellow)
       .padding(.horizontal, 6)
       .padding(.vertical, 2)
-      .background(
-        Capsule().fill(
-          state.allRunning ? Color.green.opacity(0.15) :
-          state.anyRunning ? Color.orange.opacity(0.15) :
-          Color.red.opacity(0.15)
-        )
-      )
-      .foregroundStyle(
-        state.allRunning ? .green :
-        state.anyRunning ? .orange :
-        .red
-      )
+      .background(KG.yellow.opacity(0.15))
+      .overlay(RoundedRectangle(cornerRadius: 3).stroke(KG.yellow.opacity(0.5), lineWidth: 1))
+      .cornerRadius(3)
+      .buttonStyle(.plain)
+    } else if state.isChecking {
+      HStack(spacing: 4) {
+        ProgressView()
+          .controlSize(.mini)
+          .tint(KG.yellow)
+        Text("SCANNING")
+          .font(.system(size: 8, weight: .bold, design: .monospaced))
+          .foregroundStyle(KG.yellow.opacity(0.7))
+      }
+    } else if state.isWorking {
+      HStack(spacing: 4) {
+        ProgressView()
+          .controlSize(.mini)
+          .tint(KG.cyan)
+        Text(String(state.workMessage.prefix(12)))
+          .font(.system(size: 8, design: .monospaced))
+          .foregroundStyle(KG.cyan.opacity(0.5))
+      }
+    } else {
+      Button("OK") { Task { await state.checkForUpdates() } }
+        .font(.system(size: 9, weight: .bold, design: .monospaced))
+        .foregroundStyle(KG.green.opacity(0.5))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(KG.green.opacity(0.05))
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(KG.green.opacity(0.2), lineWidth: 1))
+        .cornerRadius(3)
+        .buttonStyle(.plain)
+        .help("Check for updates")
+    }
+  }
+
+  private var startStopBadge: some View {
+    Button(state.anyRunning ? "STOP" : "START") {
+      Task {
+        if state.anyRunning { await state.stopAll() }
+        else { await state.startAll() }
+      }
+    }
+    .font(.system(size: 9, weight: .bold, design: .monospaced))
+    .foregroundStyle(state.anyRunning ? KG.pink : KG.green)
+    .padding(.horizontal, 6)
+    .padding(.vertical, 2)
+    .background((state.anyRunning ? KG.pink : KG.green).opacity(0.1))
+    .overlay(RoundedRectangle(cornerRadius: 3).stroke((state.anyRunning ? KG.pink : KG.green).opacity(0.4), lineWidth: 1))
+    .cornerRadius(3)
+    .buttonStyle(.plain)
+  }
+
+  private var statusBadge: some View {
+    let color = state.allRunning ? KG.green : state.anyRunning ? KG.yellow : KG.pink
+    let text = state.allRunning ? "ONLINE" : state.anyRunning ? "PARTIAL" : "OFFLINE"
+    return Text(text)
+      .font(.system(size: 9, weight: .bold, design: .monospaced))
+      .foregroundStyle(color)
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .background(color.opacity(0.1))
+      .overlay(RoundedRectangle(cornerRadius: 3).stroke(color.opacity(0.4), lineWidth: 1))
+      .cornerRadius(3)
+  }
+
+  private var notInstalledSection: some View {
+    VStack(spacing: 8) {
+      Text("[--] webmux not installed")
+        .font(KG.monoSmall)
+        .foregroundStyle(KG.pink.opacity(0.7))
+      Button("INSTALL WEBMUX") {
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "setup")
+      }
+      .buttonStyle(NeonAccentButton())
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 4)
   }
 
   // MARK: - Services
 
   private var servicesSection: some View {
-    VStack(spacing: 6) {
+    VStack(spacing: 4) {
       ServiceRow(
         service: .webmux,
         running: state.webmuxRunning,
@@ -70,16 +151,6 @@ struct MenuBarView: View {
         onRestart: { await state.restartService(.whisper) }
       )
 
-      HStack(spacing: 8) {
-        Button("Start All") { Task { await state.startAll() } }
-          .disabled(state.allRunning)
-        Button("Stop All") { Task { await state.stopAll() } }
-          .disabled(!state.anyRunning)
-        Spacer()
-      }
-      .controlSize(.small)
-      .buttonStyle(.bordered)
-      .padding(.top, 4)
     }
   }
 
@@ -91,55 +162,7 @@ struct MenuBarView: View {
     }
   }
 
-  // MARK: - Project
 
-  private var projectSection: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 4) {
-        Image(systemName: "checkmark.circle.fill")
-          .foregroundStyle(.green)
-          .font(.caption)
-        Text("Installed")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-
-      if state.isOutdated {
-        HStack {
-          Image(systemName: "arrow.up.circle.fill")
-            .foregroundStyle(.blue)
-            .font(.caption)
-          Text("Update available")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-          Spacer()
-          Button("Update") { Task { await state.runUpdate() } }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
-            .disabled(state.isWorking)
-        }
-      } else {
-        HStack(spacing: 6) {
-          if state.isChecking {
-            ProgressView()
-              .controlSize(.small)
-            Text("Checking...")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          } else {
-            Button("Check for updates") { Task { await state.checkForUpdates() } }
-              .controlSize(.mini)
-              .disabled(state.isWorking)
-            if !state.lastCheckMessage.isEmpty {
-              Text(state.lastCheckMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-          }
-        }
-      }
-    }
-  }
 
   // MARK: - Progress
 
@@ -147,23 +170,24 @@ struct MenuBarView: View {
     HStack(spacing: 6) {
       ProgressView()
         .controlSize(.small)
+        .tint(KG.cyan)
       Text(state.workMessage)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(3)
+        .font(KG.monoSmall)
+        .foregroundStyle(KG.cyan.opacity(0.6))
+        .lineLimit(2)
       Spacer()
     }
-    .padding(.top, 6)
+    .padding(.top, 4)
   }
 
   // MARK: - Actions
 
   private var actionsSection: some View {
-    HStack(spacing: 8) {
+    HStack(spacing: 6) {
       Button { state.openInBrowser() } label: {
-        Label("Browser", systemImage: "globe")
+        Text("OPEN")
       }
-      .controlSize(.small)
+      .buttonStyle(NeonButton(color: KG.cyan))
 
       Menu {
         ForEach(ServiceLabel.allCases, id: \.self) { service in
@@ -176,28 +200,34 @@ struct MenuBarView: View {
           }
         }
       } label: {
-        Label("Logs", systemImage: "doc.text")
+        Text("LOGS")
+          .font(KG.mono)
+          .foregroundStyle(KG.cyan)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 6)
+          .background(KG.cyan.opacity(0.08))
+          .overlay(RoundedRectangle(cornerRadius: 4).stroke(KG.cyan.opacity(0.6), lineWidth: 1))
+          .cornerRadius(4)
       }
-      .controlSize(.small)
+      .menuStyle(.borderlessButton)
 
       Spacer()
 
       Button {
+        NSApp.activate(ignoringOtherApps: true)
         openWindow(id: "setup")
       } label: {
-        Image(systemName: "gear")
+        Text("CFG")
       }
-      .controlSize(.small)
-      .help("Setup")
+      .buttonStyle(NeonButton(color: KG.purple))
 
       Button {
         NSApp.terminate(nil)
       } label: {
-        Label("Quit", systemImage: "power")
+        Text("QUIT")
       }
-      .controlSize(.small)
+      .buttonStyle(NeonButton(color: KG.pink))
     }
-    .buttonStyle(.bordered)
   }
 }
 
@@ -211,38 +241,53 @@ struct ServiceRow: View {
 
   var body: some View {
     HStack(spacing: 8) {
-      Circle()
-        .fill(running ? Color.green : Color.red.opacity(0.5))
-        .frame(width: 8, height: 8)
-
-      VStack(alignment: .leading, spacing: 0) {
-        Text(service.displayName)
-          .font(.system(size: 12, weight: .medium))
-        Text("Port \(service.port)")
-          .font(.system(size: 10))
-          .foregroundStyle(.tertiary)
+      if running {
+        Text(">")
+          .font(.system(size: 10, weight: .bold, design: .monospaced))
+          .foregroundStyle(KG.green)
+      } else {
+        Circle()
+          .fill(KG.pink.opacity(0.5))
+          .frame(width: 6, height: 6)
       }
+
+      Text(service.displayName)
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
+        .foregroundStyle(running ? KG.green : KG.cyan.opacity(0.5))
 
       Spacer()
 
       Button { Task { await onRestart() } } label: {
-        Image(systemName: "arrow.clockwise")
-          .font(.system(size: 10))
+        Text("RST")
+          .font(.system(size: 9, weight: .bold, design: .monospaced))
+          .foregroundStyle(running ? KG.cyan.opacity(0.6) : KG.cyan.opacity(0.2))
       }
-      .buttonStyle(.borderless)
+      .buttonStyle(.plain)
       .disabled(!running)
       .help("Restart")
 
-      Toggle("", isOn: Binding(
-        get: { running },
-        set: { _ in Task { await onToggle() } }
-      ))
-      .toggleStyle(.switch)
-      .controlSize(.mini)
-      .labelsHidden()
+      Button {
+        Task { await onToggle() }
+      } label: {
+        Text(running ? " ON" : "OFF")
+          .font(.system(size: 9, weight: .bold, design: .monospaced))
+          .foregroundStyle(.black)
+          .padding(.horizontal, 6)
+          .padding(.vertical, 2)
+          .background(running ? KG.green : KG.pink.opacity(0.6))
+          .cornerRadius(3)
+      }
+      .buttonStyle(.plain)
     }
     .padding(.horizontal, 8)
-    .padding(.vertical, 6)
-    .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary))
+    .padding(.vertical, 5)
+    .background(
+      RoundedRectangle(cornerRadius: 4)
+        .fill(Color.black)
+        .overlay(
+          RoundedRectangle(cornerRadius: 4)
+            .stroke(running ? KG.green.opacity(0.2) : KG.cyan.opacity(0.1), lineWidth: 1)
+        )
+    )
   }
 }

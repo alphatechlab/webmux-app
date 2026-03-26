@@ -4,76 +4,53 @@ struct StepCheckView: View {
   @Bindable var state: AppState
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("Checking your system")
-        .font(.headline)
+    VStack(alignment: .leading, spacing: 10) {
+      Text("SYSTEM CHECK")
+        .font(KG.monoBig)
+        .foregroundStyle(KG.cyan)
 
-      Text("Webmux needs a few tools to run. Let's see what's already installed.")
-        .font(.callout)
-        .foregroundStyle(.secondary)
+      Text("Scanning for required dependencies...")
+        .font(KG.monoSmall)
+        .foregroundStyle(KG.green.opacity(0.6))
 
-      VStack(spacing: 8) {
-        DepRow(
-          name: "Homebrew",
-          detail: "Package manager",
-          installed: state.hasHomebrew,
-          required: true
-        )
-        DepRow(
-          name: "Node.js",
-          detail: state.nodeVersion.isEmpty ? "JavaScript runtime" : state.nodeVersion,
-          installed: state.hasNode,
-          required: true
-        )
-        DepRow(
-          name: "Rust",
-          detail: state.rustVersion.isEmpty ? "For sidecar build" : state.rustVersion,
-          installed: state.hasRust,
-          required: true
-        )
-        DepRow(
-          name: "Python 3",
-          detail: "For Whisper (optional)",
-          installed: state.hasPython,
-          required: false
-        )
+      VStack(spacing: 2) {
+        DepRow(name: "Homebrew", detail: "package manager", installed: state.hasHomebrew, required: true)
+        DepRow(name: "Node.js", detail: state.nodeVersion.isEmpty ? "javascript runtime" : state.nodeVersion, installed: state.hasNode, required: true)
+        DepRow(name: "Rust", detail: state.rustVersion.isEmpty ? "sidecar compiler" : state.rustVersion, installed: state.hasRust, required: true)
+        DepRow(name: "Python3", detail: "whisper (optional)", installed: state.hasPython, required: false)
+        DepRow(name: "ffmpeg", detail: "audio decode (whisper)", installed: state.hasFfmpeg, required: false)
 
-        Divider().padding(.vertical, 4)
+        Rectangle().fill(KG.cyan.opacity(0.15)).frame(height: 1).padding(.vertical, 4)
 
-        DepRow(
-          name: "webmux",
-          detail: state.hasWebmux ? "Installed via Homebrew" : "Not installed",
-          installed: state.hasWebmux,
-          required: true
-        )
-        DepRow(
-          name: "Whisper",
-          detail: "Voice input (optional)",
-          installed: state.hasWhisper,
-          required: false
-        )
+        DepRow(name: "webmux", detail: state.hasWebmux ? "installed" : "not found", installed: state.hasWebmux, required: true)
+        DepRow(name: "Whisper", detail: "voice input (optional)", installed: state.hasWhisper, required: false)
       }
-      .padding(12)
-      .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary))
+      .padding(10)
+      .background(KG.bgCard)
+      .neonBorder()
 
       if !state.hasHomebrew || !state.hasNode || !state.hasRust {
         HStack(spacing: 6) {
-          Image(systemName: "exclamationmark.triangle.fill")
-            .foregroundStyle(.orange)
-          Text("Missing required dependencies. Install them first, then recheck.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
+          Text("!")
+            .font(KG.mono)
+            .foregroundStyle(.black)
+            .frame(width: 18, height: 18)
+            .background(KG.yellow)
+            .cornerRadius(2)
+          Text("Missing required deps. Install them first.")
+            .font(KG.monoSmall)
+            .foregroundStyle(KG.yellow.opacity(0.8))
+          Spacer()
+          Button("RECHECK") {
+            Task { await state.checkDependencies() }
+          }
+          .buttonStyle(NeonButton(color: KG.yellow))
         }
-
-        Button("Recheck") {
-          Task { await state.checkDependencies() }
-        }
-        .controlSize(.small)
       }
 
       Spacer()
     }
-    .padding(20)
+    .padding(16)
   }
 }
 
@@ -84,30 +61,31 @@ struct DepRow: View {
   let required: Bool
 
   var body: some View {
-    HStack {
-      Image(systemName: installed ? "checkmark.circle.fill" : "circle")
-        .foregroundStyle(installed ? .green : required ? .red.opacity(0.6) : .secondary)
-        .font(.system(size: 14))
+    HStack(spacing: 8) {
+      Text(installed ? "[OK]" : "[--]")
+        .font(KG.monoSmall)
+        .foregroundStyle(installed ? KG.green : required ? KG.pink : KG.cyan.opacity(0.3))
 
-      VStack(alignment: .leading, spacing: 0) {
-        HStack(spacing: 4) {
-          Text(name)
-            .font(.system(size: 13, weight: .medium))
-          if !required {
-            Text("optional")
-              .font(.system(size: 10))
-              .foregroundStyle(.secondary)
-              .padding(.horizontal, 4)
-              .padding(.vertical, 1)
-              .background(Capsule().fill(.quaternary))
-          }
-        }
-        Text(detail)
-          .font(.system(size: 11))
-          .foregroundStyle(.tertiary)
-      }
+      Text(name)
+        .font(KG.mono)
+        .foregroundStyle(installed ? KG.green : required ? KG.pink : KG.cyan.opacity(0.5))
+        .frame(width: 90, alignment: .leading)
+
+      Text(detail)
+        .font(KG.monoSmall)
+        .foregroundStyle(KG.cyan.opacity(0.4))
 
       Spacer()
+
+      if !required {
+        Text("OPT")
+          .font(.system(size: 8, weight: .bold, design: .monospaced))
+          .foregroundStyle(KG.cyan.opacity(0.3))
+          .padding(.horizontal, 4)
+          .padding(.vertical, 1)
+          .overlay(RoundedRectangle(cornerRadius: 2).stroke(KG.cyan.opacity(0.2), lineWidth: 1))
+      }
     }
+    .padding(.vertical, 3)
   }
 }
