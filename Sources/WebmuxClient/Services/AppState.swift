@@ -213,6 +213,28 @@ final class AppState {
     isInstalling = false
   }
 
+  func runWhisperInstall() async {
+    isInstalling = true
+    installFailed = false
+    installLog = ""
+
+    appendLog("Installing Whisper...\n")
+    let wCode = await BrewManager.installWhisper { [weak self] line in
+      Task { @MainActor [weak self] in
+        self?.appendLog(line)
+      }
+    }
+    if wCode == 0 {
+      hasWhisper = true
+      appendLog("Whisper installed!\n")
+    } else {
+      appendLog("Whisper installation failed.\n")
+      installFailed = true
+    }
+
+    isInstalling = false
+  }
+
   private func appendLog(_ text: String) {
     installLog += text
   }

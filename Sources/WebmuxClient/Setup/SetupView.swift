@@ -207,6 +207,12 @@ struct SetupView: View {
           }
           .buttonStyle(NeonAccentButton())
           .disabled(state.isInstalling)
+        } else if state.installWhisperOption && state.hasPython && !state.hasWhisper {
+          Button("INSTALL WHISPER") {
+            Task { await state.runWhisperInstall() }
+          }
+          .buttonStyle(NeonAccentButton())
+          .disabled(state.isInstalling)
         } else {
           Button("CONTINUE >") {
             withAnimation { state.setupStep = .configure }
