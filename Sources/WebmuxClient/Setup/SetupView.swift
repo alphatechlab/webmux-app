@@ -230,8 +230,9 @@ struct SetupView: View {
         .disabled(state.mode != .running)
       }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 16)
+    .padding(.horizontal, 16)
+    .padding(.top, 12)
+    .padding(.bottom, 20)
     .background(KG.bg)
   }
 }
