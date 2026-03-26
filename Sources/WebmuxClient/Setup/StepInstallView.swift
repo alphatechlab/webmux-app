@@ -49,6 +49,36 @@ struct StepInstallView: View {
           }
           .padding(.vertical, 3)
         }
+
+        if !state.missingShellTools.isEmpty {
+          Rectangle().fill(KG.cyan.opacity(0.15)).frame(height: 1).padding(.vertical, 4)
+
+          HStack(spacing: 8) {
+            Toggle("", isOn: $state.installShellToolsOption)
+              .toggleStyle(NeonToggleStyle())
+              .labelsHidden()
+
+            Text("Shell tools")
+              .font(KG.mono)
+              .foregroundStyle(state.installShellToolsOption ? KG.pink : KG.cyan.opacity(0.3))
+              .frame(width: 90, alignment: .leading)
+
+            Text(state.missingShellTools.joined(separator: ", "))
+              .font(KG.monoSmall)
+              .foregroundStyle(KG.cyan.opacity(0.4))
+              .lineLimit(2)
+
+            Spacer()
+
+            Text("OPT")
+              .font(.system(size: 8, weight: .bold, design: .monospaced))
+              .foregroundStyle(KG.cyan.opacity(0.3))
+              .padding(.horizontal, 4)
+              .padding(.vertical, 1)
+              .overlay(RoundedRectangle(cornerRadius: 2).stroke(KG.cyan.opacity(0.2), lineWidth: 1))
+          }
+          .padding(.vertical, 3)
+        }
       }
       .padding(10)
       .background(KG.bgCard)

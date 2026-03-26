@@ -38,6 +38,10 @@ final class AppState {
   var tailscaleHostname = ""
   var webmuxVersion = ""
 
+  // Shell CLI tools detected from .zshrc
+  var missingShellTools: [String] = []
+  var installShellToolsOption = true
+
   var installLog = ""
   var isInstalling = false
   var installFailed = false
@@ -46,7 +50,9 @@ final class AppState {
   var installWhisperOption = true
 
   var needsInstall: Bool {
-    !hasWebmux || (installWhisperOption && hasPython && !hasWhisper)
+    !hasWebmux
+      || (installWhisperOption && hasPython && !hasWhisper)
+      || (installShellToolsOption && !missingShellTools.isEmpty)
   }
 
   // MARK: - Runtime state
@@ -160,12 +166,39 @@ final class AppState {
         .replacingOccurrences(of: "rustc ", with: "")
     }
 
+    // Scan .zshrc for CLI tools and check which are missing
+    await detectMissingShellTools()
+
     if githubDir.isEmpty {
       let defaultDir = "\(home)/GitHub"
       if FileManager.default.fileExists(atPath: defaultDir) {
         githubDir = defaultDir
       }
     }
+  }
+
+  // Known CLI tools that may appear in .zshrc and their brew formula names
+  private static let knownTools: [String: String] = [
+    "eza": "eza", "bat": "bat", "zoxide": "zoxide", "starship": "starship",
+    "fzf": "fzf", "delta": "git-delta", "lazygit": "lazygit", "jq": "jq",
+    "httpie": "httpie", "tldr": "tldr", "neofetch": "neofetch",
+  ]
+
+  private func detectMissingShellTools() async {
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    let zshrcPath = "\(home)/.zshrc"
+    guard FileManager.default.fileExists(atPath: zshrcPath),
+          let content = try? String(contentsOfFile: zshrcPath, encoding: .utf8) else { return }
+
+    var missing: [String] = []
+    for (tool, _) in Self.knownTools {
+      // Check if tool is referenced in .zshrc (alias, eval, plugin, etc.)
+      if content.contains(tool) {
+        let r = await Shell.runAsync("which \(tool)", login: true)
+        if r.exitCode != 0 { missing.append(tool) }
+      }
+    }
+    missingShellTools = missing.sorted()
   }
 
   func checkVersions() async {
@@ -219,6 +252,25 @@ final class AppState {
 
       hasWebmux = true
       appendLog("\nWebmux installed successfully!\n")
+    }
+
+    // --- Shell tools ---
+    if installShellToolsOption && !missingShellTools.isEmpty {
+      let formulas = missingShellTools.compactMap { Self.knownTools[$0] }
+      let formulaList = formulas.joined(separator: " ")
+      appendLog("\nInstalling shell tools: \(missingShellTools.joined(separator: ", "))...\n")
+      let brew = "\(BrewManager.brewPrefix())/bin/brew"
+      let tCode = await Shell.stream("\(brew) install \(formulaList)") { [weak self] line in
+        Task { @MainActor [weak self] in
+          self?.appendLog(line)
+        }
+      }
+      if tCode == 0 {
+        missingShellTools = []
+        appendLog("Shell tools installed!\n")
+      } else {
+        appendLog("Some shell tools failed to install (non-critical).\n")
+      }
     }
 
     // --- Whisper ---
