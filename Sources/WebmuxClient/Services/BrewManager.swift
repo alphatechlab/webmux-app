@@ -90,7 +90,7 @@ enum BrewManager {
   static func tapAndInstall(onOutput: @escaping @Sendable (String) -> Void) async -> Int32 {
     let brew = "\(brewPrefix())/bin/brew"
     let code = await Shell.stream(
-      "\(brew) tap \(tapName) && \(brew) install \(formulaName)",
+      "\(brew) tap \(tapName) && \(brew) install --formula \(formulaName)",
       onLine: onOutput
     )
     return code
@@ -98,12 +98,12 @@ enum BrewManager {
 
   static func upgrade(onOutput: @escaping @Sendable (String) -> Void) async -> Int32 {
     let brew = "\(brewPrefix())/bin/brew"
-    return await Shell.stream("\(brew) upgrade \(formulaName)", onLine: onOutput)
+    return await Shell.stream("\(brew) upgrade --formula \(formulaName)", onLine: onOutput)
   }
 
   static func checkOutdated() async -> Bool {
-    let r = await Shell.runAsync("\(brewPrefix())/bin/brew outdated \(formulaName)")
-    return r.exitCode == 0 && !r.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    let r = await Shell.runAsync("\(brewPrefix())/bin/brew outdated --formula \(formulaName)")
+    return !r.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   static func installWhisper(onOutput: @escaping @Sendable (String) -> Void) async -> Int32 {

@@ -395,8 +395,8 @@ final class AppState {
   }
 
   private func startUpdatePolling() {
-    let sixHours: TimeInterval = 6 * 60 * 60
-    updateTimer = Timer.scheduledTimer(withTimeInterval: sixHours, repeats: true) { [weak self] _ in
+    let oneHour: TimeInterval = 60 * 60
+    updateTimer = Timer.scheduledTimer(withTimeInterval: oneHour, repeats: true) { [weak self] _ in
       Task { @MainActor [weak self] in
         await self?.checkForUpdates()
       }

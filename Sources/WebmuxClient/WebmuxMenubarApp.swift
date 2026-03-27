@@ -30,7 +30,15 @@ struct WebmuxClientApp: App {
     MenuBarExtra {
       MenuBarView(state: state)
     } label: {
-      Image(systemName: state.allRunning ? "terminal.fill" : "terminal")
+      ZStack(alignment: .topTrailing) {
+        Image(systemName: state.allRunning ? "terminal.fill" : "terminal")
+        if state.isOutdated {
+          Circle()
+            .fill(.yellow)
+            .frame(width: 6, height: 6)
+            .offset(x: 2, y: -2)
+        }
+      }
     }
     .menuBarExtraStyle(.window)
   }
