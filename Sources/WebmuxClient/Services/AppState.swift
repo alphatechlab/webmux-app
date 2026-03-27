@@ -69,11 +69,18 @@ final class AppState {
   var backendOutdated = false
   var clientOutdated = false
   var latestClientVersion = ""
-  var isOutdated: Bool { backendOutdated || clientOutdated }
+  var isOutdated: Bool { backendOutdated || clientOutdated || claudeOutdated }
   var isWorking = false
   var workMessage = ""
   var lastCheckMessage = ""
   var isChecking = false
+
+  // Claude CLI
+  var claudeInstalled = false
+  var claudeCurrentVersion = ""
+  var claudeLatestVersion = ""
+  var claudeOutdated = false
+  var isUpdatingClaude = false
 
   var currentClientVersion: String {
     Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
@@ -465,15 +472,19 @@ final class AppState {
       }
     }
 
+    // Check Claude CLI
+    await checkClaudeVersion()
+
     lastCheckMessage = isOutdated ? "" : "Up to date"
     isChecking = false
   }
 
   var updateSummary: String {
-    if backendOutdated && clientOutdated { return "SERVER+APP" }
-    if backendOutdated { return "SERVER" }
-    if clientOutdated { return "APP" }
-    return ""
+    var parts: [String] = []
+    if backendOutdated { parts.append("SERVER") }
+    if clientOutdated { parts.append("APP") }
+    if claudeOutdated { parts.append("CLAUDE") }
+    return parts.joined(separator: "+")
   }
 
   func runUpdate() async {
@@ -523,13 +534,61 @@ final class AppState {
       }
     }
 
-    if !backendOutdated && !clientOutdated {
+    if claudeOutdated {
+      await updateClaude()
+    }
+
+    if !backendOutdated && !clientOutdated && !claudeOutdated {
       workMessage = "All updated!"
       try? await Task.sleep(for: .seconds(1))
     }
 
     isWorking = false
     refreshServices()
+  }
+
+  // MARK: - Claude CLI
+
+  private func checkClaudeVersion() async {
+    let which = await Shell.runAsync("which claude", login: true)
+    guard which.exitCode == 0,
+          !which.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      claudeInstalled = false
+      claudeOutdated = false
+      return
+    }
+    claudeInstalled = true
+
+    let current = await Shell.runAsync("claude --version 2>/dev/null", login: true)
+    claudeCurrentVersion = current.output
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+      .components(separatedBy: "\n").last?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+    let latest = await Shell.runAsync("npm view @anthropic-ai/claude-code version 2>/dev/null", login: true)
+    claudeLatestVersion = latest.output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    if !claudeCurrentVersion.isEmpty && !claudeLatestVersion.isEmpty {
+      claudeOutdated = claudeCurrentVersion != claudeLatestVersion
+    } else {
+      claudeOutdated = false
+    }
+  }
+
+  private func updateClaude() async {
+    isUpdatingClaude = true
+    workMessage = "Updating Claude CLI..."
+
+    let result = await Shell.runAsync("npm install -g @anthropic-ai/claude-code@latest 2>&1", login: true)
+    if result.exitCode == 0 {
+      claudeOutdated = false
+      claudeCurrentVersion = claudeLatestVersion
+    } else {
+      workMessage = "Claude update failed"
+      try? await Task.sleep(for: .seconds(3))
+    }
+
+    isUpdatingClaude = false
   }
 
   // MARK: - Actions
