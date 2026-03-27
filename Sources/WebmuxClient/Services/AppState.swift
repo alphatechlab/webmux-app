@@ -579,7 +579,7 @@ final class AppState {
     isUpdatingClaude = true
     workMessage = "Updating Claude CLI..."
 
-    let result = await Shell.runAsync("npm install -g @anthropic-ai/claude-code@latest 2>&1", login: true)
+    let result = await Shell.runAsync("npm install -g --force @anthropic-ai/claude-code@latest 2>&1", login: true)
     if result.exitCode == 0 {
       claudeOutdated = false
       claudeCurrentVersion = claudeLatestVersion
