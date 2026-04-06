@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Observation
+import ServiceManagement
 
 @Observable
 @MainActor
@@ -59,6 +60,19 @@ final class AppState {
 
   var webmuxRunning = false
   var whisperRunning = false
+  var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled {
+    didSet {
+      do {
+        if launchAtLogin {
+          try SMAppService.mainApp.register()
+        } else {
+          try SMAppService.mainApp.unregister()
+        }
+      } catch {
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+      }
+    }
+  }
   var caffeinateEnabled: Bool = UserDefaults.standard.bool(forKey: "caffeinateEnabled") {
     didSet {
       UserDefaults.standard.set(caffeinateEnabled, forKey: "caffeinateEnabled")
